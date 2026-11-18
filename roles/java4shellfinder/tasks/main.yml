@@ -24,6 +24,10 @@
     msg:
       - "CPU Flags Status: {{ cpuflags_status.stdout }}"
       - "Running Java Processes: {{ javarunningprocesses_list.stdout_lines }}"
+  when:
+    - cpuflags_status.stdout == "Vulnerable!"
+    - javarunningprocesses_list.stdout_lines is defined
+    - javarunningprocesses_list.stdout_lines | length > 0
   register: report_output
 
 - name: Ensure reports directory exists locally
@@ -39,5 +43,6 @@
     dest: "{{ playbook_dir }}/reports/{{ inventory_hostname }}-Java4ShellFinder.txt"
   when:
     - cpuflags_status.stdout == "Vulnerable!"
+    - javarunningprocesses_list.stdout_lines is defined
     - javarunningprocesses_list.stdout_lines | length > 0
   delegate_to: localhost
