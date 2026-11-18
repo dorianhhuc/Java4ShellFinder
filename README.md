@@ -6,8 +6,9 @@ This playbook contains one role:
 - **java4shellfinder**
     - Checks if CPU flags exist for Java4Shell exploitation
     - Lists running Java processes on vulnerable machines
+    - Summarizes findings
     - Ensures reports directory exists locally
-    - Writes Java4Shell reports per individual inventory host to reports directory
+    - Saves output locally to reports directory, per inventory hostname
 
 ## Usage
 
