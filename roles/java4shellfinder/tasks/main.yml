@@ -1,0 +1,43 @@
+---
+
+- name: Check if CPU flags exist for Java4Shell exploitation
+  become: yes
+  shell: |
+    if [[ $(grep -m1 '^flags' /proc/cpuinfo | tr ' ' '\n' | grep -E '^(avx512f|avx512bw|avx512vbmi|bmi2)$' | wc -l) == "4" ]]; then
+      echo "Vulnerable!"
+    else
+      echo "Not vulnerable!"
+    fi
+  args:
+    executable: /bin/bash
+  register: cpuflags_status
+
+- name: List running Java processes on vulnerable machines
+  become: yes
+  shell:
+    cmd: /bin/pgrep -a java
+  when: cpuflags_status.stdout == "Vulnerable!"
+  register: javarunningprocesses_list
+
+- name: Report Java4Shell vulnerability status on vulnerable hosts
+  debug:
+    msg:
+      - "CPU Flags Status: {{ cpuflags_status.stdout }}"
+      - "Running Java Processes: {{ javarunningprocesses_list.stdout_lines }}"
+  when:
+    - cpuflags_status.stdout == "Vulnerable!"
+    - javarunningprocesses_list.stdout_lines | length > 0
+  register: report_output
+
+- name: Ensure reports directory exists locally
+  file:
+    path: "{{ playbook_dir }}/reports"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+
+- name: Save output locally to reports directory, per inventory hostname
+  ansible.builtin.copy:
+    content: "{{ report_output }}"
+    dest: "{{ playbook_dir }}/reports/{{ inventory_hostname }}-Java4ShellFinder.txt"
+  delegate_to: localhost

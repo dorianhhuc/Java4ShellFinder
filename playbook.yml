@@ -1,0 +1,6 @@
+---
+
+- hosts: all
+  roles:
+    - role: "java4shellfinder"
+      tags: "java4shellfinder"
