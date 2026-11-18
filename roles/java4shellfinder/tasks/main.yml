@@ -15,7 +15,7 @@
 - name: List running Java processes on vulnerable machines
   become: yes
   shell:
-    cmd: /bin/pgrep -a java
+    cmd: pgrep -a java
   when: cpuflags_status.stdout == "Vulnerable!"
   register: javarunningprocesses_list
 
