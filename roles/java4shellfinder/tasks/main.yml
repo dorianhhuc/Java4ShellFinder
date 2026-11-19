@@ -14,8 +14,13 @@
 
 - name: List running Java processes on vulnerable machines
   become: yes
-  shell:
-    cmd: pgrep -a java
+  shell: >
+    for p in $(ps aux | awk '{ print $11 }' | grep java); do
+      if [[ -x "$(which $p)" ]]; then
+        $p -version
+      fi
+    done \
+    && pgrep -a java
   when: cpuflags_status.stdout == "Vulnerable!"
   register: javarunningprocesses_list
 
@@ -51,7 +56,7 @@
     - cpuflags_status.stdout == "Vulnerable!"
     - javarunningprocesses_list.stdout_lines is defined
     - javarunningprocesses_list.stdout_lines | length > 0
-    - javarunningprocesses_docker_listi.stdout_lines is not defined
+    - javarunningprocesses_docker_list.stdout_lines is not defined
   register: report_output_nodocker
 
 - name: Summarize findings
