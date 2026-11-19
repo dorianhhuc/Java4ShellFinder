@@ -2,7 +2,7 @@
 
 - name: Check if CPU flags exist for Java4Shell exploitation
   become: yes
-  shell: |
+  shell: >
     if [[ $(grep -m1 '^flags' /proc/cpuinfo | tr ' ' '\n' | grep -E '^(avx512f|avx512bw|avx512vbmi|bmi2)$' | wc -l) == "4" ]]; then
       echo "Vulnerable!"
     else
@@ -19,6 +19,29 @@
   when: cpuflags_status.stdout == "Vulnerable!"
   register: javarunningprocesses_list
 
+- name: Check if Docker is installed
+  command: docker --version
+  register: docker_valid
+  ignore_errors: yes
+
+- name: List all Docker containers and their Java processes
+  become: yes
+  shell: >
+    for c in $(docker ps --format "table {% raw %}{{.Names}}{% endraw %}" | tail -n +2); do
+      for p in $(docker top $c | awk '{ print $8 }' | grep java); do
+        echo "--- $c ---" \
+        && docker exec -t $c $p -version \
+        && docker top $c | grep java
+        echo ""
+      done
+    done
+  args:
+    executable: /bin/bash
+  when:
+    - not docker_valid.failed
+    - cpuflags_status.stdout == "Vulnerable!"
+  register: javarunningprocesses_docker_list
+
 - name: Summarize findings
   debug:
     msg:
@@ -28,6 +51,21 @@
     - cpuflags_status.stdout == "Vulnerable!"
     - javarunningprocesses_list.stdout_lines is defined
     - javarunningprocesses_list.stdout_lines | length > 0
+    - javarunningprocesses_docker_listi.stdout_lines is not defined
+  register: report_output_nodocker
+
+- name: Summarize findings
+  debug:
+    msg:
+      - "CPU Flags Status: {{ cpuflags_status.stdout }}"
+      - "Running Java Processes: {{ javarunningprocesses_list.stdout_lines }}"
+      - "Running Java Processes in Docker: {{ javarunningprocesses_docker_list.stdout_lines }}"
+  when:
+    - cpuflags_status.stdout == "Vulnerable!"
+    - javarunningprocesses_list.stdout_lines is defined
+    - javarunningprocesses_list.stdout_lines | length > 0
+    - javarunningprocesses_docker_list.stdout_lines is defined
+    - javarunningprocesses_docker_list.stdout_lines | length > 0
   register: report_output
 
 - name: Ensure reports directory exists locally
@@ -37,12 +75,25 @@
     mode: '0755'
   delegate_to: localhost
 
-- name: Save output locally to reports directory, per inventory hostname
+- name: Save output locally to reports directory, per inventory hostname, no Docker
   ansible.builtin.copy:
-    content: "{{ report_output }}"
-    dest: "{{ playbook_dir }}/reports/{{ inventory_hostname }}-Java4ShellFinder.txt"
+    content: "{{ report_output_nodocker }}"
+    dest: "{{ playbook_dir }}/reports/{{ inventory_hostname }}-Java4ShellFinder.json"
   when:
     - cpuflags_status.stdout == "Vulnerable!"
     - javarunningprocesses_list.stdout_lines is defined
     - javarunningprocesses_list.stdout_lines | length > 0
+    - javarunningprocesses_docker_list.stdout_lines is not defined
+  delegate_to: localhost
+
+- name: Save output locally to reports directory, per inventory hostname, with Docker
+  ansible.builtin.copy:
+    content: "{{ report_output }}"
+    dest: "{{ playbook_dir }}/reports/{{ inventory_hostname }}-Java4ShellFinder.json"
+  when:
+    - cpuflags_status.stdout == "Vulnerable!"
+    - javarunningprocesses_list.stdout_lines is defined
+    - javarunningprocesses_list.stdout_lines | length > 0
+    - javarunningprocesses_docker_list.stdout_lines is defined
+    - javarunningprocesses_docker_list.stdout_lines | length > 0
   delegate_to: localhost
