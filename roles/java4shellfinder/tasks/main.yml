@@ -16,11 +16,10 @@
   become: yes
   shell: >
     for p in $(ps aux | awk '{ print $11 }' | grep java); do
-      if [[ -x "$(which $p)" ]]; then
-        $p -version
+      if command -v "$p" >/dev/null 2>&1; then
+        "$p" -version 2>&1
       fi
-    done \
-    && pgrep -a java
+    done; pgrep -a java
   when: cpuflags_status.stdout == "Vulnerable!"
   register: javarunningprocesses_list
 
@@ -33,10 +32,10 @@
   become: yes
   shell: >
     for c in $(docker ps --format "table {% raw %}{{.Names}}{% endraw %}" | tail -n +2); do
-      for p in $(docker top $c | awk '{ print $8 }' | grep java); do
+      for p in $(docker top "$c" | awk '{ print $8 }' | grep java); do
         echo "--- $c ---" \
-        && docker exec -t $c $p -version \
-        && docker top $c | grep java
+        && docker exec -t "$c" "$p" -version \
+        && docker top "$c" | grep java
         echo ""
       done
     done
