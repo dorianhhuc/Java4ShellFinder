@@ -12,7 +12,7 @@
     executable: /bin/bash
   register: cpuflags_status
 
-- name: List running Java processes on vulnerable machines
+- name: List running Java versions (if executable is host-resolvable) and processes on vulnerable machines
   become: yes
   shell: >
     for p in $(ps aux | awk '{ print $11 }' | grep java); do
@@ -28,7 +28,7 @@
   register: docker_valid
   ignore_errors: yes
 
-- name: List all Docker containers and their Java processes
+- name: List all Docker containers and their Java versions and processes on vulnerable machines
   become: yes
   shell: >
     for c in $(docker ps --format "table {% raw %}{{.Names}}{% endraw %}" | tail -n +2); do
@@ -46,7 +46,7 @@
     - cpuflags_status.stdout == "Vulnerable!"
   register: javarunningprocesses_docker_list
 
-- name: Summarize findings
+- name: Summarize findings (no Docker)
   debug:
     msg:
       - "CPU Flags Status: {{ cpuflags_status.stdout }}"
@@ -58,7 +58,7 @@
     - javarunningprocesses_docker_list.stdout_lines is not defined
   register: report_output_nodocker
 
-- name: Summarize findings
+- name: Summarize findings (with Docker)
   debug:
     msg:
       - "CPU Flags Status: {{ cpuflags_status.stdout }}"
@@ -79,7 +79,7 @@
     mode: '0755'
   delegate_to: localhost
 
-- name: Save output locally to reports directory, per inventory hostname, no Docker
+- name: Save output locally to reports directory, per inventory hostname (no Docker)
   ansible.builtin.copy:
     content: "{{ report_output_nodocker }}"
     dest: "{{ playbook_dir }}/reports/{{ inventory_hostname }}-Java4ShellFinder.json"
@@ -90,7 +90,7 @@
     - javarunningprocesses_docker_list.stdout_lines is not defined
   delegate_to: localhost
 
-- name: Save output locally to reports directory, per inventory hostname, with Docker
+- name: Save output locally to reports directory, per inventory hostname (with Docker)
   ansible.builtin.copy:
     content: "{{ report_output }}"
     dest: "{{ playbook_dir }}/reports/{{ inventory_hostname }}-Java4ShellFinder.json"
